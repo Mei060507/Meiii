@@ -1,54 +1,123 @@
 import streamlit as st
-import datetime
+import numpy as np
+import matplotlib.pyplot as plt
+from matplotlib.patches import Circle
+import time
 
-# Ambil tahun saat ini secara dinamis
-TAHUN_SEKARANG = datetime.date.today().year
+st.set_page_config(page_title="Virtual Lab: Waktu & Jarak", layout="wide")
 
-def hitung_usia(tahun_lahir, tahun_sekarang=TAHUN_SEKARANG):
-    """Menghitung usia (hanya tahun) berdasarkan tahun lahir."""
-    
-    # Pastikan input adalah integer sebelum perhitungan
-    try:
-        tahun_lahir = int(tahun_lahir)
-    except ValueError:
-        return "Error: Tahun lahir harus berupa angka."
-        
-    usia = tahun_sekarang - tahun_lahir
-    return usia
+# --------------------------
+# Fungsi perhitungan
+# --------------------------
+def compute_meeting_time(dist, v1, v2):
+    if v1 + v2 == 0:
+        return None
+    return dist / (v1 + v2)
 
-# --- Tampilan Streamlit ---
+def pos_at_time(t, dist, v1, v2):
+    x1 = v1 * t
+    x2 = dist - v2 * t
+    return x1, x2
 
-st.set_page_config(
-    page_title="Kalkulator Usia Sederhana",
-    layout="centered"
-)
+# --------------------------
+# Judul aplikasi
+# --------------------------
+st.title("🚗🧍 Virtual Lab Matematika — Waktu & Jarak (Pertemuan)")
+st.write("Atur parameter lalu lihat animasinya! Cocok untuk pembelajaran jarak, waktu, dan kecepatan.")
 
-st.title("🎂 Kalkulator Usia Sederhana")
-st.markdown(f"*(Tahun sekarang disetel ke **{TAHUN_SEKARANG}**)*")
+# --------------------------
+# Sidebar (Input)
+# --------------------------
+with st.sidebar:
+    st.header("Parameter")
+    dist = st.number_input("Jarak awal (meter)", min_value=1.0, value=100.0)
+    v1 = st.number_input("Kecepatan A (m/s)", min_value=0.0, value=3.0)
+    v2 = st.number_input("Kecepatan B (m/s)", min_value=0.0, value=4.0)
 
-# Widget input Streamlit (Teks input untuk tahun lahir)
-tahun_lahir_input = st.number_input(
-    "Masukkan Tahun Lahir Anda:",
-    min_value=1900,
-    max_value=TAHUN_SEKARANG,
-    value=2000, # Nilai default
-    step=1,
-    format="%d" # Pastikan input berupa integer
-)
+    autoplay = st.checkbox("Auto Play Animasi", value=False)
+    speed = st.slider("Kecepatan animasi (x)", 0.2, 5.0, 1.0)
 
-# Tombol untuk memicu perhitungan
-if st.button("Hitung Usia"):
-    if tahun_lahir_input:
-        # Panggil fungsi
-        usia_hasil = hitung_usia(tahun_lahir_input)
-        
-        # Tampilkan hasil
-        st.balloons() # Efek visual 
-        st.success(
-            f"Jika Anda lahir tahun **{tahun_lahir_input}** dan sekarang adalah tahun **{TAHUN_SEKARANG}**, "
-            f"usia Anda adalah: **{usia_hasil} tahun**"
-        )
+# --------------------------
+# Hitung waktu pertemuan
+# --------------------------
+t_meet = compute_meeting_time(dist, v1, v2)
+
+col1, col2 = st.columns([3,2])
+
+# --------------------------
+# Grafik animasi
+# --------------------------
+with col1:
+
+    fig, ax = plt.subplots(figsize=(9,3))
+
+    max_time = t_meet * 1.2 if t_meet else 20
+    t = st.slider("Waktu (detik)", 0.0, float(max_time), 0.0, 0.1)
+
+    x1, x2 = pos_at_time(t, dist, v1, v2)
+
+    ax.set_xlim(0, dist)
+    ax.set_ylim(-1, 1)
+    ax.set_yticks([])
+
+    ax.hlines(0, 0, dist, linewidth=5, color="gray")
+
+    # Objek A
+    objA = Circle((x1, 0), radius=1, color="blue")
+    ax.add_patch(objA)
+    ax.text(x1, 0.3, "A 🧍", ha="center")
+
+    # Objek B
+    objB = Circle((x2, 0), radius=1, color="red")
+    ax.add_patch(objB)
+    ax.text(x2, 0.3, "B 🚗", ha="center")
+
+    # Titik temu
+    if t_meet and t >= t_meet:
+        ax.scatter([v1*t_meet], [0], color="gold", s=150, marker="*", zorder=10)
+        ax.text(v1*t_meet, -0.5, "Titik Temu ⭐", ha="center", fontsize=10)
+
+    st.pyplot(fig)
+
+    # Auto play
+    if autoplay:
+        place = st.empty()
+        ct = 0
+        while ct < max_time:
+            fig, ax = plt.subplots(figsize=(9,3))
+            x1, x2 = pos_at_time(ct, dist, v1, v2)
+
+            ax.set_xlim(0, dist)
+            ax.set_ylim(-1, 1)
+            ax.set_yticks([])
+            ax.hlines(0, 0, dist, linewidth=5, color="gray")
+
+            ax.add_patch(Circle((x1,0), radius=1, color="blue"))
+            ax.text(x1, 0.3, "A 🧍", ha="center")
+
+            ax.add_patch(Circle((x2,0), radius=1, color="red"))
+            ax.text(x2, 0.3, "B 🚗", ha="center")
+
+            if t_meet and ct >= t_meet:
+                ax.scatter([v1*t_meet], [0], color="gold", s=150, marker="*")
+                ax.text(v1*t_meet, -0.5, "Titik Temu ⭐", ha="center")
+
+            place.pyplot(fig)
+            ct += 0.1 * speed
+            time.sleep(0.05)
+
+# --------------------------
+# Perhitungan
+# --------------------------
+with col2:
+    st.header("Hasil Perhitungan")
+
+    if t_meet:
+        st.success(f"Waktu pertemuan = **{t_meet:.2f} detik**")
+        st.info(f"Mereka bertemu pada posisi **x = {v1*t_meet:.2f} meter** dari titik A.")
     else:
-        st.warning("Mohon masukkan tahun lahir terlebih dahulu.")
+        st.error("Mereka tidak akan pernah bertemu (jumlah kecepatan = 0).")
 
-st.sidebar.info("Aplikasi sederhana yang dibuat dengan Streamlit.")
+    st.markdown("---")
+    st.write("Rumus dasar bila bergerak saling mendekat:")
+    st.latex(r"t = \frac{\text{jarak}}{v_1 + v_2}")
